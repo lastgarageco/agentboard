@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AgentBoard — AI Venture Studio</title>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --surface: #121620;
+      --card: #171c28;
+      --border: #242b3d;
+      --text: #e6ebf5;
+      --muted: #8b95ad;
+      --accent: #6366f1;
+      --gold: #f59e0b;
+      --green: #10b981;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --purple: #a855f7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--surface);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; }
+    .badge {
+      font-size: 11px; padding: 2px 8px; border-radius: 999px;
+      background: rgba(99,102,241,0.18); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.35);
+    }
+    .cfo-ticker {
+      display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--muted);
+      background: var(--bg); padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border);
+    }
+    .cfo-ticker strong { color: var(--text); }
+    .cfo-ticker .ok { color: var(--green); }
+    .toolbar {
+      padding: 12px 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .filters { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pill {
+      background: var(--surface); color: var(--muted); border: 1px solid var(--border);
+      padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    }
+    .pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .controls { display: flex; gap: 8px; }
+    input[type="search"], input[type="text"], select, textarea {
+      background: var(--surface); color: var(--text); border: 1px solid var(--border);
+      padding: 6px 10px; border-radius: 6px; font-size: 12px;
+    }
+    button.primary {
+      background: var(--accent); color: #fff; border: none; padding: 7px 14px;
+      border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .board {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(5, minmax(240px, 1fr));
+      gap: 14px;
+      padding: 18px 24px;
+      overflow-x: auto;
+    }
+    .col {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 480px;
+    }
+    .col.board-action {
+      border-color: rgba(245, 158, 11, 0.5);
+      background: linear-gradient(180deg, rgba(245,158,11,0.06), var(--surface));
+    }
+    .col-head {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--muted); padding-bottom: 6px; border-bottom: 1px solid var(--border);
+    }
+    .col.board-action .col-head { color: var(--gold); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: grab;
+    }
+    .card:hover { border-color: #3b4661; }
+    .card-top { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--muted); }
+    .dept { font-weight: 700; padding: 1px 6px; border-radius: 4px; font-size: 10px; }
+    .dept-ENG { background: rgba(59,130,246,0.18); color: #93c5fd; }
+    .dept-GROWTH { background: rgba(16,185,129,0.18); color: #6ee7b7; }
+    .dept-PROD { background: rgba(168,85,247,0.18); color: #d8b4fe; }
+    .dept-FIN { background: rgba(245,158,11,0.18); color: #fcd34d; }
+    .dept-LEGAL { background: rgba(239,68,68,0.18); color: #fca5a5; }
+    .card-title { font-size: 13px; font-weight: 600; line-height: 1.35; }
+    .card-desc { font-size: 11px; color: var(--muted); line-height: 1.4; }
+    .card-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 11px; color: var(--muted); }
+    .move-sel { font-size: 10px; padding: 2px 4px; }
+    dialog {
+      margin: auto; background: var(--surface); color: var(--text); border: 1px solid var(--border);
+      border-radius: 10px; padding: 18px; width: 380px; max-width: 92vw;
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.65); }
+    .form-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span>AgentBoard</span>
+      <span class="badge">OpenPulse v1 · SQLite + MCP</span>
+    </div>
+    <div class="cfo-ticker" id="cfoTicker">
+      <span>Seed Reserve: <strong class="ok">$500.00</strong></span>
+      <span>Spent: <strong>$0.00</strong></span>
+      <span>Goal 1 Streak: <strong>0 / 3 wks</strong> ($10/wk)</span>
+      <span>Entity: <strong>Sole Proprietorship</strong></span>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="filters" id="deptFilters">
+      <button class="pill active" data-dept="ALL">ALL</button>
+      <button class="pill" data-dept="ENG">ENG</button>
+      <button class="pill" data-dept="GROWTH">GROWTH</button>
+      <button class="pill" data-dept="PROD">PROD</button>
+      <button class="pill" data-dept="FIN">FIN</button>
+      <button class="pill" data-dept="LEGAL">LEGAL</button>
+    </div>
+    <div class="controls">
+      <input type="search" id="searchInput" placeholder="Filter tasks (press /)..." />
+      <button class="primary" id="newTaskBtn">+ New Task (n)</button>
+    </div>
+  </div>
+
+  <main class="board" id="board"></main>
+
+  <dialog id="taskModal">
+    <h3 style="font-size:15px;">Create AgentBoard Ticket</h3>
+    <form id="taskForm" class="form-grid">
+      <input type="text" id="tId" placeholder="ID (e.g., ENG-04)" required />
+      <input type="text" id="tTitle" placeholder="Task title" required />
+      <textarea id="tDesc" rows="3" placeholder="Description"></textarea>
+      <select id="tDept">
+        <option value="ENG">ENG (CTO)</option>
+        <option value="GROWTH">GROWTH (CRO)</option>
+        <option value="PROD">PROD (CPO)</option>
+        <option value="FIN">FIN (CFO)</option>
+        <option value="LEGAL">LEGAL (General Counsel)</option>
+      </select>
+      <select id="tStatus">
+        <option value="TODO">TODO</option>
+        <option value="BACKLOG">BACKLOG</option>
+        <option value="IN_PROGRESS">IN_PROGRESS</option>
+        <option value="BOARD_ACTION">BOARD_ACTION</option>
+        <option value="DONE">DONE</option>
+      </select>
+      <select id="tPriority">
+        <option value="HIGH">HIGH</option>
+        <option value="URGENT">URGENT</option>
+        <option value="MEDIUM" selected>MEDIUM</option>
+        <option value="LOW">LOW</option>
+      </select>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:6px;">
+        <button type="button" class="pill" id="cancelModal">Cancel</button>
+        <button type="submit" class="primary">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const COLUMNS = [
+      { key: "BACKLOG", label: "Backlog" },
+      { key: "TODO", label: "Todo" },
+      { key: "IN_PROGRESS", label: "In Progress" },
+      { key: "BOARD_ACTION", label: "Board Action", cls: "board-action" },
+      { key: "DONE", label: "Done" }
+    ];
+    let tasks = [];
+    let activeDept = "ALL";
+
+    async function fetchData() {
+      const [tRes, cRes] = await Promise.all([fetch("/api/tasks"), fetch("/api/cfo")]);
+      const tJson = await tRes.json();
+      const cJson = await cRes.json();
+      tasks = tJson.tasks || [];
+      document.getElementById("cfoTicker").innerHTML = `
+        <span>Seed Reserve: <strong class="ok">$${cJson.remaining_reserve.toFixed(2)}</strong></span>
+        <span>Spent: <strong>$${cJson.spent_to_date.toFixed(2)}</strong></span>
+        <span>Goal 1 Streak: <strong>${cJson.streak_current} / ${cJson.streak_required} wks</strong> ($${cJson.weekly_target.toFixed(0)}/wk)</span>
+        <span>Entity: <strong>${cJson.entity_status}</strong></span>
+      `;
+      render();
+    }
+
+    async function moveTask(id, status) {
+      await fetch(`/api/tasks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+      await fetchData();
+    }
+
+    function render() {
+      const q = document.getElementById("searchInput").value.toLowerCase();
+      const board = document.getElementById("board");
+      board.innerHTML = "";
+      for (const col of COLUMNS) {
+        const colTasks = tasks.filter(t =>
+          t.status === col.key &&
+          (activeDept === "ALL" || t.department === activeDept) &&
+          (!q || t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q))
+        );
+        const colEl = document.createElement("section");
+        colEl.className = `col ${col.cls || ""}`;
+        colEl.ondragover = e => e.preventDefault();
+        colEl.ondrop = e => {
+          const id = e.dataTransfer.getData("text/plain");
+          if (id) moveTask(id, col.key);
+        };
+        colEl.innerHTML = `<div class="col-head"><span>${col.label}</span><span>${colTasks.length}</span></div>`;
+        for (const t of colTasks) {
+          const card = document.createElement("article");
+          card.className = "card";
+          card.draggable = true;
+          card.ondragstart = e => e.dataTransfer.setData("text/plain", t.id);
+          card.innerHTML = `
+            <div class="card-top">
+              <span>${t.id}</span>
+              <span class="dept dept-${t.department}">${t.department}</span>
+            </div>
+            <div class="card-title">${t.title}</div>
+            <div class="card-desc">${t.description || ""}</div>
+            <div class="card-foot">
+              <span>${t.assignee} · ${t.priority}</span>
+              <select class="move-sel">
+                ${COLUMNS.map(c => `<option value="${c.key}" ${c.key === t.status ? "selected" : ""}>${c.label}</option>`).join("")}
+              </select>
+            </div>
+          `;
+          card.querySelector("select").onchange = e => moveTask(t.id, e.target.value);
+          colEl.appendChild(card);
+        }
+        board.appendChild(colEl);
+      }
+    }
+
+    document.getElementById("deptFilters").onclick = e => {
+      if (!e.target.dataset.dept) return;
+      activeDept = e.target.dataset.dept;
+      document.querySelectorAll(".pill[data-dept]").forEach(b => b.classList.toggle("active", b.dataset.dept === activeDept));
+      render();
+    };
+    document.getElementById("searchInput").oninput = render;
+
+    const modal = document.getElementById("taskModal");
+    document.getElementById("newTaskBtn").onclick = () => modal.showModal();
+    document.getElementById("cancelModal").onclick = () => modal.close();
+    document.getElementById("taskForm").onsubmit = async e => {
+      e.preventDefault();
+      await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: document.getElementById("tId").value,
+          title: document.getElementById("tTitle").value,
+          description: document.getElementById("tDesc").value,
+          department: document.getElementById("tDept").value,
+          status: document.getElementById("tStatus").value,
+          priority: document.getElementById("tPriority").value
+        })
+      });
+      modal.close();
+      e.target.reset();
+      await fetchData();
+    };
+
+    document.addEventListener("keydown", e => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (e.key === "/") { e.preventDefault(); document.getElementById("searchInput").focus(); }
+      if (e.key === "n") { e.preventDefault(); modal.showModal(); }
+    });
+
+    fetchData();
+  </script>
+</body>
+</html>
