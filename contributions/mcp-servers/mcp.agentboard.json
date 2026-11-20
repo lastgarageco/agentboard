@@ -1,0 +1,43 @@
+{
+  "name": "agentboard",
+  "displayName": "Project AgentBoard (OpenPulse)",
+  "version": "1.0.0",
+  "description": "Zero-dependency local-first SQLite (WAL) + stdio MCP Kanban tracker built for autonomous AI agent swarms.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lastgarageco/agentboard"
+  },
+  "runtime": "python3",
+  "transport": {
+    "type": "stdio",
+    "command": "python3",
+    "args": ["mcp_server.py"],
+    "env": {
+      "PYTHONUNBUFFERED": "1"
+    }
+  },
+  "tools": [
+    {
+      "name": "board_list",
+      "description": "List tasks from AgentBoard SQLite database filtered by department or status."
+    },
+    {
+      "name": "board_add",
+      "description": "Create a new task ticket on AgentBoard."
+    },
+    {
+      "name": "board_move",
+      "description": "Move an existing task to a new Kanban status (enforces BOARD_ACTION human-approval lock)."
+    },
+    {
+      "name": "board_flag_board",
+      "description": "Flag a task as BOARD_ACTION for sole Board Member approval."
+    }
+  ],
+  "tags": ["kanban", "sqlite", "mcp", "task-tracker", "agent-swarms"],
+  "links": {
+    "mcpStarterPack": "https://lfgauser.gumroad.com/l/nauaoa",
+    "allAccessBundle": "https://lfgauser.gumroad.com/l/spolwr"
+  }
+}

@@ -63,6 +63,13 @@ def init_db(seed: bool = True) -> None:
                 details TEXT DEFAULT '',
                 created_at TEXT NOT NULL
             );
+
+            CREATE TRIGGER IF NOT EXISTS enforce_board_action_lock
+            BEFORE UPDATE ON tasks
+            WHEN OLD.status = 'BOARD_ACTION' AND NEW.status = 'DONE' AND NEW.board_action != 0
+            BEGIN
+                SELECT RAISE(ABORT, 'BOARD_ACTION_LOCKED: explicit human approve_board_action required');
+            END;
             """
         )
 
@@ -127,6 +134,23 @@ def log_activity(conn: sqlite3.Connection, task_id: str, actor: str, action: str
         "INSERT INTO activity_log (task_id, actor, action, details, created_at) VALUES (?, ?, ?, ?, ?)",
         (task_id, actor, action, details, now_iso()),
     )
+
+
+def approve_board_action(conn: sqlite3.Connection, task_id: str, actor: str = "Board Member") -> dict:
+    tid = task_id.strip().upper()
+    existing = conn.execute("SELECT * FROM tasks WHERE id = ?", (tid,)).fetchone()
+    if not existing:
+        raise KeyError(f"Task {tid} not found")
+    if existing["status"] != "BOARD_ACTION":
+        raise ValueError(f"Task {tid} is in {existing['status']}, not BOARD_ACTION")
+    ts = now_iso()
+    with conn:
+        conn.execute(
+            "UPDATE tasks SET status = 'DONE', board_action = 0, updated_at = ? WHERE id = ?",
+            (ts, tid),
+        )
+        log_activity(conn, tid, actor, "APPROVE_BOARD_ACTION", "Approved BOARD_ACTION -> DONE")
+    return dict(conn.execute("SELECT * FROM tasks WHERE id = ?", (tid,)).fetchone())
 
 
 def get_cfo_metrics() -> dict:
@@ -267,6 +291,10 @@ class BoardHandler(BaseHTTPRequestHandler):
             priority = data.get("priority", existing["priority"]).strip().upper()
             title = data.get("title", existing["title"]).strip()
             desc = data.get("description", existing["description"]).strip()
+            if existing["status"] == "BOARD_ACTION" and status == "DONE":
+                conn.close()
+                self._send_json(403, {"error": "BOARD_ACTION_LOCKED: explicit POST /api/tasks/<id>/approve required"})
+                return
             board_action = 1 if status == "BOARD_ACTION" else int(data.get("board_action", existing["board_action"]))
             if status not in VALID_STATUSES or priority not in VALID_PRIORITIES:
                 conn.close()
@@ -329,6 +357,10 @@ def main() -> int:
     p_flag = sub.add_parser("flag-board", help="Flag a task for BOARD_ACTION")
     p_flag.add_argument("id")
 
+    p_approve = sub.add_parser("approve-board", help="Human Board approval for a BOARD_ACTION task")
+    p_approve.add_argument("id")
+    p_approve.add_argument("--actor", default="Board Member")
+
     p_serve = sub.add_parser("serve", help="Start Kanban HTTP server")
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=3000)
@@ -372,18 +404,25 @@ def main() -> int:
 
     if args.cmd == "move":
         conn = get_conn()
+        tid = args.id.upper()
+        existing = conn.execute("SELECT status FROM tasks WHERE id = ?", (tid,)).fetchone()
+        if not existing:
+            conn.close()
+            print(f"Task {tid} not found", file=sys.stderr)
+            return 1
+        if existing["status"] == "BOARD_ACTION" and args.status == "DONE":
+            conn.close()
+            print(f"BOARD_ACTION_LOCKED: {tid} requires explicit 'approve-board {tid}' before moving to DONE", file=sys.stderr)
+            return 1
         ba = 1 if args.status == "BOARD_ACTION" else 0
         with conn:
-            cur = conn.execute(
+            conn.execute(
                 "UPDATE tasks SET status = ?, board_action = ?, updated_at = ? WHERE id = ?",
-                (args.status, ba, now_iso(), args.id.upper()),
+                (args.status, ba, now_iso(), tid),
             )
-            if cur.rowcount == 0:
-                print(f"Task {args.id.upper()} not found", file=sys.stderr)
-                return 1
-            log_activity(conn, args.id.upper(), "CLI", "MOVE_TASK", args.status)
+            log_activity(conn, tid, "CLI", "MOVE_TASK", args.status)
         conn.close()
-        print(f"Moved {args.id.upper()} -> {args.status}")
+        print(f"Moved {tid} -> {args.status}")
         return 0
 
     if args.cmd == "flag-board":
@@ -399,6 +438,18 @@ def main() -> int:
             log_activity(conn, args.id.upper(), "CLI", "FLAG_BOARD_ACTION", "")
         conn.close()
         print(f"Flagged {args.id.upper()} for BOARD_ACTION")
+        return 0
+
+    if args.cmd == "approve-board":
+        conn = get_conn()
+        try:
+            row = approve_board_action(conn, args.id, actor=args.actor)
+        except Exception as exc:
+            conn.close()
+            print(str(exc), file=sys.stderr)
+            return 1
+        conn.close()
+        print(f"Approved {row['id']} -> DONE")
         return 0
 
     if args.cmd == "serve":

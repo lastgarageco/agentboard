@@ -101,14 +101,20 @@ def call_tool(name: str, args: dict) -> dict:
         if name == "board_move":
             tid = args["id"].upper()
             status = args["status"].upper()
+            existing = conn.execute("SELECT status FROM tasks WHERE id=?", (tid,)).fetchone()
+            if not existing:
+                return {"isError": True, "content": [{"type": "text", "text": f"Task {tid} not found"}]}
+            if existing["status"] == "BOARD_ACTION" and status == "DONE":
+                return {
+                    "isError": True,
+                    "content": [{"type": "text", "text": f"BOARD_ACTION_LOCKED: {tid} requires explicit human approve_board_action before moving to DONE."}],
+                }
             ba = 1 if status == "BOARD_ACTION" else 0
             with conn:
-                cur = conn.execute(
+                conn.execute(
                     "UPDATE tasks SET status=?, board_action=?, updated_at=? WHERE id=?",
                     (status, ba, agentboard.now_iso(), tid),
                 )
-                if cur.rowcount == 0:
-                    return {"isError": True, "content": [{"type": "text", "text": f"Task {tid} not found"}]}
                 agentboard.log_activity(conn, tid, "MCP", "MOVE_TASK", status)
             return {"content": [{"type": "text", "text": f"Moved {tid} -> {status}"}]}
 
